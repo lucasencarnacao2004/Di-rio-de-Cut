@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diário de Corte</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14181B">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Diário de Corte">
+<link rel="icon" href="icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Bitter:wght@500;700;800&display=swap');
+
+:root{
+  --bg: #14181B;
+  --surface: #1C2226;
+  --surface2: #222A2F;
+  --line: #2B3439;
+  --bone: #E9E4D6;
+  --muted: #8B95A1;
+  --brass: #C9A876;
+  --brass-dim: #9A8563;
+  --brick: #C1666B;
+  --green: #8FA876;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background: var(--bg);
+  color: var(--bone);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+  padding: 20px 14px 60px;
+}
+.wrap{ max-width: 720px; margin: 0 auto; }
+
+header{
+  display:flex; justify-content:space-between; align-items:flex-end;
+  border-bottom: 2px solid var(--brass); padding-bottom: 14px; margin-bottom: 20px;
+}
+h1{
+  font-family: 'Bitter', serif; font-weight: 800; font-size: 22px;
+  letter-spacing: 0.5px; color: var(--bone);
+}
+.subtitle{ font-size: 11px; color: var(--muted); margin-top:4px; letter-spacing:0.5px;}
+.stamp{
+  font-size: 10px; color: var(--brass); border:1px solid var(--brass);
+  padding: 3px 8px; border-radius: 2px; letter-spacing: 1px; white-space:nowrap;
+}
+
+.newbtn{
+  width:100%; background: var(--brass); color: #14181B; border:none;
+  font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px;
+  padding: 13px; border-radius: 3px; cursor:pointer; letter-spacing: 0.5px;
+  margin-bottom: 18px;
+}
+.newbtn:active{ background: var(--brass-dim); }
+
+.weeklist{ display:flex; flex-direction:column; gap:8px; margin-bottom: 24px; }
+.weekcard{
+  background: var(--surface); border:1px solid var(--line); border-radius:4px;
+  padding: 12px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;
+  transition: border-color 0.15s;
+}
+.weekcard:hover{ border-color: var(--brass-dim); }
+.weekcard.active{ border-color: var(--brass); background: var(--surface2); }
+.weekcard .wc-label{ font-size:13px; font-weight:600; }
+.weekcard .wc-sub{ font-size:10px; color:var(--muted); margin-top:2px; }
+.wc-status{ font-size:11px; font-weight:700; padding: 3px 8px; border-radius:2px; }
+.wc-status.under{ color: var(--green); border:1px solid var(--green); }
+.wc-status.over{ color: var(--brick); border:1px solid var(--brick); }
+.wc-status.pending{ color: var(--muted); border:1px solid var(--line); }
+
+.panel{
+  background: var(--surface); border:1px solid var(--line); border-radius:6px;
+  padding: 20px; margin-bottom: 20px;
+}
+.panel-title{
+  font-family:'Bitter', serif; font-weight:700; font-size:15px; margin-bottom:16px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.panel-title .del{ font-size:10px; color:var(--brick); cursor:pointer; letter-spacing:0.5px; border:1px solid var(--brick); padding:3px 7px; border-radius:2px; }
+
+.field{ margin-bottom: 14px; }
+.field label{ display:block; font-size:10px; color:var(--muted); letter-spacing:0.5px; margin-bottom:5px; text-transform:uppercase; }
+.field input{
+  width:100%; background:var(--bg); border:1px solid var(--line); color:var(--bone);
+  font-family:'IBM Plex Mono',monospace; font-size:14px; padding:10px 11px; border-radius:3px;
+}
+.field input:focus{ outline:none; border-color:var(--brass); }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+.gauge-wrap{ margin: 18px 0; }
+.gauge-numbers{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+.gauge-remaining{ font-family:'Bitter',serif; font-weight:800; font-size:30px; }
+.gauge-remaining.neg{ color: var(--brick); }
+.gauge-remaining.pos{ color: var(--bone); }
+.gauge-label{ font-size:10px; color:var(--muted); letter-spacing:0.5px; }
+.gauge-track{ height:10px; background:var(--bg); border-radius:5px; overflow:hidden; border:1px solid var(--line); }
+.gauge-fill{ height:100%; background: linear-gradient(90deg, var(--brass-dim), var(--brass)); transition: width 0.3s; }
+.gauge-fill.over{ background: linear-gradient(90deg, var(--brick), #d98a8e); }
+.gauge-fill.steps{ background: linear-gradient(90deg, var(--green), #a9c294); }
+.gauge-meta{ display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:6px; }
+
+.training-block{ margin: 18px 0; }
+.training-counts{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+.training-counts .tc-main{ font-family:'Bitter',serif; font-weight:800; font-size:18px; }
+.training-counts .tc-sub{ font-size:10px; color:var(--muted); letter-spacing:0.5px; }
+.training-strip{ display:grid; grid-template-columns: repeat(7,1fr); gap:6px; }
+.t-chip{
+  background:var(--bg); border:1px solid var(--line); border-radius:4px;
+  padding:7px 2px; text-align:center; display:flex; flex-direction:column; gap:3px;
+}
+.t-chip-day{ font-size:9px; color:var(--muted); letter-spacing:0.5px; }
+.t-chip-val{ font-size:11px; font-weight:700; color:var(--muted); }
+.t-chip.train{ border-color: var(--brass-dim); }
+.t-chip.train .t-chip-val{ color: var(--brass); }
+.t-chip.rest{ border-color: var(--green); }
+.t-chip.rest .t-chip-val{ color: var(--green); }
+
+.days{ display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+.day-card{ background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:10px 12px; }
+.day-card.filled{ border-color: var(--brass-dim); }
+.day-card-top{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+.day-card-name{ font-size:11px; color:var(--muted); letter-spacing:0.5px; min-width:30px; }
+.day-card select{
+  flex:1; background:var(--surface); border:1px solid var(--line); color:var(--bone);
+  font-family:'IBM Plex Mono',monospace; font-size:12px; padding:7px 8px; border-radius:3px;
+}
+.day-card select:focus{ outline:none; border-color:var(--brass); }
+.day-card-bottom{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.day-card-bottom input{
+  background:var(--surface); border:1px solid var(--line); color:var(--bone);
+  font-family:'IBM Plex Mono',monospace; font-size:13px; padding:9px 8px; border-radius:3px; width:100%;
+}
+.day-card-bottom input:focus{ outline:none; border-color:var(--brass); }
+.day-card-bottom input.steps-input:focus{ border-color: var(--green); }
+
+.balance{
+  margin-top: 20px; padding-top: 18px; border-top: 1px dashed var(--line);
+}
+.balance-title{ font-family:'Bitter',serif; font-weight:700; font-size:13px; margin-bottom:12px; }
+.balance-badge{
+  display:inline-block; font-size:12px; font-weight:700; padding: 6px 12px; border-radius:3px;
+  letter-spacing:0.5px; margin-bottom: 12px;
+}
+.balance-badge.deficit{ color: var(--green); border:1px solid var(--green); background: rgba(143,168,118,0.08); }
+.balance-badge.surplus{ color: var(--brick); border:1px solid var(--brick); background: rgba(193,102,107,0.08); }
+.balance-badge.maint{ color: var(--brass); border:1px solid var(--brass); background: rgba(201,168,118,0.08); }
+.balance-rows{ display:flex; flex-direction:column; gap:8px; }
+.balance-row{ display:flex; justify-content:space-between; font-size:12px; }
+.balance-row .lbl{ color:var(--muted); }
+.balance-row .val{ font-weight:600; }
+.balance-note{ font-size:10px; color:var(--muted); margin-top:10px; line-height:1.5; }
+
+.stats-strip{ display:grid; grid-template-columns: repeat(3,1fr); gap:10px; margin-top:18px; }
+.stat{ background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:10px; text-align:center; }
+.stat .v{ font-family:'Bitter',serif; font-weight:700; font-size:16px; }
+.stat .l{ font-size:9px; color:var(--muted); letter-spacing:0.5px; margin-top:3px; }
+
+.empty{ text-align:center; padding: 40px 20px; color:var(--muted); font-size:12px; }
+.hint{ font-size:11px; color:var(--muted); margin-top:6px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Diário de Corte</h1>
+      <div class="subtitle">registro semanal · peso · calorias · déficit</div>
+    </div>
+    <div class="stamp" id="weekCountStamp">0 semanas</div>
+  </header>
+
+  <button class="newbtn" id="newWeekBtn">+ Nova semana</button>
+
+  <div class="weeklist" id="weekList"></div>
+
+  <div id="detailPanel"></div>
+</div>
+
+<script>
+// ---- Armazenamento local (substitui window.storage do ambiente Claude) ----
+// Os dados ficam salvos no localStorage deste navegador/dispositivo.
+const LS_PREFIX = 'diario-corte:';
+window.storage = {
+  async get(key, shared){
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if(raw === null) return null;
+    return { key, value: raw, shared: !!shared };
+  },
+  async set(key, value, shared){
+    localStorage.setItem(LS_PREFIX + key, value);
+    return { key, value, shared: !!shared };
+  },
+  async delete(key, shared){
+    localStorage.removeItem(LS_PREFIX + key);
+    return { key, deleted: true, shared: !!shared };
+  },
+  async list(prefix, shared){
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith(LS_PREFIX)){
+        const stripped = k.slice(LS_PREFIX.length);
+        if(!prefix || stripped.startsWith(prefix)) keys.push(stripped);
+      }
+    }
+    return { keys, prefix, shared: !!shared };
+  }
+};
+// ---------------------------------------------------------------------------
+
+const DAYS = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+const TRAINING_LABELS = { push:'Push', pull:'Pull', legs:'Legs', upper:'Upper', lower:'Lower', rest:'Descanso' };
+const TRAINING_ABBR = { push:'Pu', pull:'Pl', legs:'Lg', upper:'Up', lower:'Lo', rest:'Ds' };
+let weeks = {}; // key: week:{id} -> value
+let activeId = null;
+
+async function loadAll(){
+  const listRes = await window.storage.list('week:', false).catch(()=>null);
+  weeks = {};
+  if(listRes && listRes.keys && listRes.keys.length){
+    for(const k of listRes.keys){
+      try{
+        const r = await window.storage.get(k, false);
+        if(r) weeks[k] = JSON.parse(r.value);
+      }catch(e){ /* skip missing */ }
+    }
+  }
+  renderWeekList();
+  if(activeId && weeks[activeId]) renderDetail(activeId);
+  else { activeId = null; renderDetail(null); }
+}
+
+function sortedWeekKeys(){
+  return Object.keys(weeks).sort((a,b)=> weeks[b].startDate.localeCompare(weeks[a].startDate));
+}
+
+function fmt(n){
+  return Math.round(n).toLocaleString('pt-BR');
+}
+
+function calcSuggestedTarget(weight){
+  const tmb = 10*weight + 6.25*183 - 5*22 + 5;
+  const stepsKcal = 140000 * 0.05 * (weight/88.5);
+  const trainingKcal = 3250 * (weight/88.5);
+  const subtotal = tmb*7 + stepsKcal + trainingKcal;
+  const tef = subtotal * 0.10;
+  const maintenance = subtotal + tef;
+  return Math.round(maintenance - 3850); // deficit for 0.5kg/week
+}
+
+const WEEKLY_STEPS_GOAL = 140000;
+const WEEKLY_TRAINING_GOAL = 5;
+const WEEKLY_REST_GOAL = 2;
+
+// Estimativa de gasto calórico real da semana com base no peso inicial, passos registrados e dias de treino registrados
+function calcWeeklyExpenditure(weight, actualStepsSum, trainingDaysCount){
+  const tmb = 10*weight + 6.25*183 - 5*22 + 5;
+  const stepsKcal = actualStepsSum * 0.05 * (weight/88.5);
+  const trainingKcal = 500 * trainingDaysCount * (weight/88.5); // ~500 kcal/sessão PPL/UL (2 séries/exercício, 4-8 reps, 0-1 RIR)
+  const subtotal = tmb*7 + stepsKcal + trainingKcal;
+  const tef = subtotal * 0.10;
+  return subtotal + tef;
+}
+
+function weekTotals(w){
+  const steps = w.steps || [null,null,null,null,null,null,null];
+  const workouts = w.workouts || [null,null,null,null,null,null,null];
+  const filled = w.days.filter(d => d !== null && d !== '' && !isNaN(d));
+  const consumed = filled.reduce((s,d)=> s + Number(d), 0);
+  const remaining = w.target - consumed;
+  const daysLogged = filled.length;
+  const daysLeft = 7 - daysLogged;
+  const avgSoFar = daysLogged ? consumed/daysLogged : 0;
+  const avgAllowedRest = daysLeft > 0 ? remaining/daysLeft : 0;
+
+  const stepsFilled = steps.filter(s => s !== null && s !== '' && !isNaN(s));
+  const stepsSum = stepsFilled.reduce((s,d)=> s + Number(d), 0);
+  const stepsRemaining = WEEKLY_STEPS_GOAL - stepsSum;
+  const stepsDaysLogged = stepsFilled.length;
+
+  const trainingDaysLogged = workouts.filter(v => v && v !== 'rest').length;
+  const restDaysLogged = workouts.filter(v => v === 'rest').length;
+  const workoutDaysSet = workouts.filter(v => v).length;
+
+  const expenditure = calcWeeklyExpenditure(w.startWeight, stepsSum, trainingDaysLogged);
+  const balance = expenditure - consumed; // positivo = déficit, negativo = superávit
+
+  return {consumed, remaining, daysLogged, daysLeft, avgSoFar, avgAllowedRest,
+    stepsSum, stepsRemaining, stepsDaysLogged, trainingDaysLogged, restDaysLogged, workoutDaysSet,
+    stepsSum, stepsRemaining, stepsDaysLogged, expenditure, balance};
+}
+
+function renderWeekList(){
+  const container = document.getElementById('weekList');
+  const keys = sortedWeekKeys();
+  document.getElementById('weekCountStamp').textContent = keys.length + (keys.length===1 ? ' semana' : ' semanas');
+  if(!keys.length){
+    container.innerHTML = '<div class="empty">Nenhuma semana registrada ainda.<br>Toque em "Nova semana" para começar.</div>';
+    return;
+  }
+  container.innerHTML = keys.map(k=>{
+    const w = weeks[k];
+    const t = weekTotals(w);
+    let statusClass = 'pending', statusText = 'em andamento';
+    if(t.daysLogged === 7){
+      statusClass = t.remaining >= 0 ? 'under' : 'over';
+      statusText = t.remaining >= 0 ? 'dentro da meta' : 'excedeu';
+    }
+    const isActive = k === activeId;
+    return `<div class="weekcard ${isActive?'active':''}" data-id="${k}">
+      <div>
+        <div class="wc-label">${w.label}</div>
+        <div class="wc-sub">peso inicial: ${w.startWeight} kg · meta: ${fmt(w.target)} kcal</div>
+      </div>
+      <div class="wc-status ${statusClass}">${statusText}</div>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.weekcard').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      activeId = el.dataset.id;
+      renderWeekList();
+      renderDetail(activeId);
+    });
+  });
+}
+
+function renderDetail(id){
+  const panel = document.getElementById('detailPanel');
+  if(!id || !weeks[id]){ panel.innerHTML = ''; return; }
+  const w = weeks[id];
+  if(!w.steps) w.steps = [null,null,null,null,null,null,null];
+  if(!w.workouts) w.workouts = [null,null,null,null,null,null,null];
+  const t = weekTotals(w);
+  const pct = Math.min(100, Math.max(0, (t.consumed / w.target) * 100));
+  const over = t.remaining < 0;
+  const stepsPct = Math.min(100, Math.max(0, (t.stepsSum / WEEKLY_STEPS_GOAL) * 100));
+  const stepsOver = t.stepsRemaining < 0;
+
+  let balanceClass = 'maint', balanceLabel = 'Manutenção';
+  const bandKcal = 250; // tolerância pra considerar "manutenção"
+  if(t.balance > bandKcal){ balanceClass = 'deficit'; balanceLabel = 'Déficit'; }
+  else if(t.balance < -bandKcal){ balanceClass = 'surplus'; balanceLabel = 'Superávit'; }
+  const allLogged = t.daysLogged === 7 && t.stepsDaysLogged === 7 && t.workoutDaysSet === 7;
+
+  panel.innerHTML = `
+    <div class="panel">
+      <div class="panel-title">
+        <span>${w.label}</span>
+        <span class="del" id="delWeekBtn">excluir</span>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Peso inicial (kg)</label>
+          <input type="number" step="0.1" id="startWeightInput" value="${w.startWeight}">
+        </div>
+        <div class="field">
+          <label>Meta semanal (kcal)</label>
+          <input type="number" step="10" id="targetInput" value="${w.target}">
+        </div>
+      </div>
+
+      <div class="gauge-wrap">
+        <div class="gauge-numbers">
+          <div>
+            <div class="gauge-remaining ${over?'neg':'pos'}">${over?'−':''}${fmt(Math.abs(t.remaining))}</div>
+            <div class="gauge-label">${over ? 'kcal acima da meta' : 'kcal restantes na semana'}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;color:var(--muted)">${fmt(t.consumed)} / ${fmt(w.target)}</div>
+            <div class="gauge-label">consumido</div>
+          </div>
+        </div>
+        <div class="gauge-track"><div class="gauge-fill ${over?'over':''}" style="width:${pct}%"></div></div>
+        <div class="gauge-meta">
+          <span>${t.daysLogged}/7 dias registrados</span>
+          <span>${t.daysLeft>0 ? 'média permitida/dia restante: '+fmt(t.avgAllowedRest)+' kcal' : 'semana completa'}</span>
+        </div>
+      </div>
+
+      <div class="gauge-wrap">
+        <div class="gauge-numbers">
+          <div>
+            <div class="gauge-remaining ${stepsOver?'pos':'pos'}" style="color:${stepsOver?'var(--green)':'var(--bone)'}">${stepsOver?'+':''}${fmt(Math.abs(t.stepsRemaining))}</div>
+            <div class="gauge-label">${stepsOver ? 'passos acima da meta' : 'passos restantes na semana'}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;color:var(--muted)">${fmt(t.stepsSum)} / ${fmt(WEEKLY_STEPS_GOAL)}</div>
+            <div class="gauge-label">caminhados</div>
+          </div>
+        </div>
+        <div class="gauge-track"><div class="gauge-fill steps" style="width:${stepsPct}%"></div></div>
+        <div class="gauge-meta">
+          <span>${t.stepsDaysLogged}/7 dias registrados</span>
+          <span>meta: 140.000 passos/semana</span>
+        </div>
+      </div>
+
+      <div class="training-block">
+        <div class="training-counts">
+          <div>
+            <div class="tc-main">${t.trainingDaysLogged}/${WEEKLY_TRAINING_GOAL} <span style="font-size:11px;color:var(--muted);font-weight:400;">treinos</span> · ${t.restDaysLogged}/${WEEKLY_REST_GOAL} <span style="font-size:11px;color:var(--muted);font-weight:400;">descansos</span></div>
+          </div>
+          <div class="tc-sub">${t.workoutDaysSet}/7 dias definidos</div>
+        </div>
+        <div class="training-strip">
+          ${DAYS.map((d,i)=>{
+            const val = w.workouts[i];
+            const abbr = val ? TRAINING_ABBR[val] : '·';
+            const cls = val ? (val==='rest' ? 'rest' : 'train') : '';
+            return `<div class="t-chip ${cls}"><span class="t-chip-day">${d}</span><span class="t-chip-val">${abbr}</span></div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="days">
+        ${DAYS.map((d,i)=>`
+          <div class="day-card ${(w.days[i] || w.steps[i] || w.workouts[i]) ? 'filled':''}">
+            <div class="day-card-top">
+              <span class="day-card-name">${d}</span>
+              <select data-workoutday="${i}">
+                <option value="">— treino —</option>
+                <option value="push" ${w.workouts[i]==='push'?'selected':''}>Push</option>
+                <option value="pull" ${w.workouts[i]==='pull'?'selected':''}>Pull</option>
+                <option value="legs" ${w.workouts[i]==='legs'?'selected':''}>Legs</option>
+                <option value="upper" ${w.workouts[i]==='upper'?'selected':''}>Upper</option>
+                <option value="lower" ${w.workouts[i]==='lower'?'selected':''}>Lower</option>
+                <option value="rest" ${w.workouts[i]==='rest'?'selected':''}>Descanso</option>
+              </select>
+            </div>
+            <div class="day-card-bottom">
+              <input type="number" placeholder="kcal" data-day="${i}" value="${w.days[i] ?? ''}">
+              <input type="number" placeholder="passos" class="steps-input" data-stepday="${i}" value="${w.steps[i] ?? ''}">
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="stats-strip">
+        <div class="stat"><div class="v">${fmt(t.avgSoFar)}</div><div class="l">MÉDIA/DIA (ATÉ AGORA)</div></div>
+        <div class="stat"><div class="v">${fmt(w.target/7)}</div><div class="l">MÉDIA/DIA ALVO</div></div>
+        <div class="stat"><div class="v">${t.daysLogged}/7</div><div class="l">DIAS REGISTRADOS</div></div>
+      </div>
+      <div class="hint">Meta sugerida com base no peso inicial (déficit de ~3.850 kcal/semana ≈ 0,5 kg). Ajuste manualmente se quiser.</div>
+
+      <div class="balance">
+        <div class="balance-title">Balanço da semana ${allLogged ? '' : '<span style="color:var(--muted); font-weight:400; font-size:10px;">(parcial — com base no que já foi preenchido)</span>'}</div>
+        <div class="balance-badge ${balanceClass}">${balanceLabel} de ${fmt(Math.abs(t.balance))} kcal</div>
+        <div class="balance-rows">
+          <div class="balance-row"><span class="lbl">Gasto calórico estimado</span><span class="val">${fmt(t.expenditure)} kcal</span></div>
+          <div class="balance-row"><span class="lbl">Calorias consumidas</span><span class="val">${fmt(t.consumed)} kcal</span></div>
+          <div class="balance-row"><span class="lbl">Passos registrados</span><span class="val">${fmt(t.stepsSum)}</span></div>
+        </div>
+        <div class="balance-note">Gasto estimado a partir do peso inicial, dos passos registrados e dos dias de treino efetivamente marcados nesta semana (~500 kcal/sessão PPL/UL). Quanto mais dias preenchidos, mais precisa a estimativa.</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('startWeightInput').addEventListener('change', async (e)=>{
+    const val = parseFloat(e.target.value);
+    if(!isNaN(val)){
+      w.startWeight = val;
+      await saveWeek(id, w);
+    }
+  });
+  document.getElementById('targetInput').addEventListener('change', async (e)=>{
+    const val = parseFloat(e.target.value);
+    if(!isNaN(val)){
+      w.target = val;
+      await saveWeek(id, w);
+      renderDetail(id);
+      renderWeekList();
+    }
+  });
+  panel.querySelectorAll('.day-card input[data-day]').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{
+      const dayIdx = Number(e.target.dataset.day);
+      const val = e.target.value === '' ? null : parseFloat(e.target.value);
+      w.days[dayIdx] = val;
+      await saveWeek(id, w);
+      renderDetail(id);
+      renderWeekList();
+    });
+  });
+  panel.querySelectorAll('.day-card input[data-stepday]').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{
+      const dayIdx = Number(e.target.dataset.stepday);
+      const val = e.target.value === '' ? null : parseFloat(e.target.value);
+      w.steps[dayIdx] = val;
+      await saveWeek(id, w);
+      renderDetail(id);
+      renderWeekList();
+    });
+  });
+  panel.querySelectorAll('select[data-workoutday]').forEach(sel=>{
+    sel.addEventListener('change', async (e)=>{
+      const dayIdx = Number(e.target.dataset.workoutday);
+      const val = e.target.value === '' ? null : e.target.value;
+      w.workouts[dayIdx] = val;
+      await saveWeek(id, w);
+      renderDetail(id);
+      renderWeekList();
+    });
+  });
+  document.getElementById('delWeekBtn').addEventListener('click', async ()=>{
+    if(confirm('Excluir esta semana? Essa ação não pode ser desfeita.')){
+      try{
+        await window.storage.delete(id, false);
+      }catch(e){}
+      delete weeks[id];
+      activeId = null;
+      renderWeekList();
+      renderDetail(null);
+    }
+  });
+}
+
+async function saveWeek(id, w){
+  try{
+    await window.storage.set(id, JSON.stringify(w), false);
+  }catch(e){
+    console.error('Falha ao salvar', e);
+  }
+}
+
+function nextMondayLabel(){
+  const keys = sortedWeekKeys();
+  let base;
+  if(keys.length){
+    const lastStart = new Date(weeks[keys[0]].startDate + 'T00:00:00');
+    base = new Date(lastStart);
+    base.setDate(base.getDate() + 7);
+  } else {
+    base = new Date();
+    const day = base.getDay(); // 0 Sun .. 6 Sat
+    const diffToMonday = (day === 0) ? 1 : (8 - day) % 7;
+    if(day !== 1) base.setDate(base.getDate() + ((1 - day + 7) % 7));
+  }
+  return base;
+}
+
+function fmtDateBR(d){ return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}); }
+
+function parseDateBR(str){
+  str = str.trim();
+  let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m){
+    const day = parseInt(m[1],10), month = parseInt(m[2],10), year = parseInt(m[3],10);
+    const d = new Date(year, month-1, day);
+    if(d.getFullYear()===year && d.getMonth()===month-1 && d.getDate()===day) return d;
+    return null;
+  }
+  m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m){
+    const year = parseInt(m[1],10), month = parseInt(m[2],10), day = parseInt(m[3],10);
+    const d = new Date(year, month-1, day);
+    if(d.getFullYear()===year && d.getMonth()===month-1 && d.getDate()===day) return d;
+    return null;
+  }
+  return null;
+}
+
+document.getElementById('newWeekBtn').addEventListener('click', async ()=>{
+  const lastKey = sortedWeekKeys()[0];
+  const defaultWeight = lastKey ? weeks[lastKey].startWeight : 88.5;
+  const weightStr = prompt('Peso inicial desta semana (kg):', defaultWeight);
+  if(weightStr === null) return;
+  const weight = parseFloat(weightStr.replace(',', '.'));
+  if(isNaN(weight)){ alert('Peso inválido.'); return; }
+
+  const suggestedDate = nextMondayLabel();
+  let startDate = null;
+  while(!startDate){
+    const dateStr = prompt('Data de início da semana (DD/MM/AAAA):', fmtDateBR(suggestedDate));
+    if(dateStr === null) return;
+    startDate = parseDateBR(dateStr);
+    if(!startDate){ alert('Data inválida. Use o formato DD/MM/AAAA.'); }
+  }
+  const iso = startDate.getFullYear() + '-' + String(startDate.getMonth()+1).padStart(2,'0') + '-' + String(startDate.getDate()).padStart(2,'0');
+  const endDate = new Date(startDate); endDate.setDate(endDate.getDate()+6);
+  const fmtShort = (d)=> d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+  const label = `${fmtShort(startDate)} – ${fmtShort(endDate)}`;
+
+  const id = 'week:' + iso;
+  if(weeks[id]){
+    if(!confirm('Já existe uma semana começando nessa data. Deseja substituí-la?')) return;
+  }
+
+  const suggested = calcSuggestedTarget(weight);
+  const targetStr = prompt('Meta calórica para a semana (kcal):', suggested);
+  if(targetStr === null) return;
+  const target = parseFloat(targetStr.replace(',', '.'));
+  if(isNaN(target)){ alert('Meta inválida.'); return; }
+
+  const w = { startDate: iso, label, startWeight: weight, target,
+    days: [null,null,null,null,null,null,null],
+    steps: [null,null,null,null,null,null,null],
+    workouts: [null,null,null,null,null,null,null] };
+  weeks[id] = w;
+  await saveWeek(id, w);
+  activeId = id;
+  renderWeekList();
+  renderDetail(id);
+});
+
+loadAll();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
