@@ -58,6 +58,14 @@ h1{
 }
 .newbtn:active{ background: var(--brass-dim); }
 
+.secbtn{
+  width:100%; background: transparent; color: var(--muted); border:1px solid var(--line);
+  font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:11px;
+  padding: 10px; border-radius: 3px; cursor:pointer; letter-spacing: 0.5px;
+  margin-bottom: 18px; margin-top: -10px;
+}
+.secbtn:active{ border-color: var(--brass-dim); color: var(--brass); }
+
 .weeklist{ display:flex; flex-direction:column; gap:8px; margin-bottom: 24px; }
 .weekcard{
   background: var(--surface); border:1px solid var(--line); border-radius:4px;
@@ -175,6 +183,7 @@ h1{
   </header>
 
   <button class="newbtn" id="newWeekBtn">+ Nova semana</button>
+  <button class="secbtn" id="exportBtn">⤓ Exportar dados (backup / colar no chat)</button>
 
   <div class="weeklist" id="weekList"></div>
 
@@ -615,6 +624,43 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
+
+document.getElementById('exportBtn').addEventListener('click', async ()=>{
+  const keys = sortedWeekKeys();
+  if(!keys.length){ alert('Nenhuma semana registrada ainda.'); return; }
+  const exportPayload = {
+    exportedAt: new Date().toISOString(),
+    app: 'diario-de-corte',
+    weeks: keys.map(k => {
+      const w = weeks[k];
+      const t = weekTotals(w);
+      return {
+        semana: w.label,
+        dataInicio: w.startDate,
+        pesoInicial: w.startWeight,
+        metaKcal: w.target,
+        kcalPorDia: w.days,
+        passosPorDia: w.steps,
+        treinoPorDia: w.workouts,
+        resumo: {
+          kcalConsumidasTotal: Math.round(t.consumed),
+          passosTotal: t.stepsSum,
+          diasDeTreino: t.trainingDaysLogged,
+          diasDeDescanso: t.restDaysLogged,
+          gastoEstimadoTotal: Math.round(t.expenditure),
+          balancoKcal: Math.round(t.balance)
+        }
+      };
+    })
+  };
+  const text = JSON.stringify(exportPayload, null, 2);
+  try{
+    await navigator.clipboard.writeText(text);
+    alert('Dados copiados! Agora é só colar aqui na conversa com o Claude.');
+  }catch(e){
+    prompt('Não deu pra copiar automaticamente. Selecione tudo (Ctrl+A / Cmd+A) e copie manualmente:', text);
+  }
+});
 </script>
 </body>
 </html>
