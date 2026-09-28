@@ -223,8 +223,9 @@ window.storage = {
 // ---------------------------------------------------------------------------
 
 const DAYS = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
-const TRAINING_LABELS = { push:'Push', pull:'Pull', legs:'Legs', upper:'Upper', lower:'Lower', rest:'Descanso' };
-const TRAINING_ABBR = { push:'Pu', pull:'Pl', legs:'Lg', upper:'Up', lower:'Lo', rest:'Ds' };
+const TRAINING_LABELS = { torso:'Torso A', limbs:'Limbs A', push:'Push', pull:'Pull', legs:'Legs', upper:'Upper', lower:'Lower', rest:'Descanso' };
+const TRAINING_ABBR = { torso:'To', limbs:'Li', push:'Pu', pull:'Pl', legs:'Lg', upper:'Up', lower:'Lo', rest:'Ds' };
+const DEFAULT_STEPS_GOAL = 140000;
 let weeks = {}; // key: week:{id} -> value
 let activeId = null;
 
@@ -252,19 +253,18 @@ function fmt(n){
   return Math.round(n).toLocaleString('pt-BR');
 }
 
-function calcSuggestedTarget(weight){
+function calcSuggestedTarget(weight, stepsGoal){
   const tmb = 10*weight + 6.25*183 - 5*22 + 5;
-  const stepsKcal = 140000 * 0.05 * (weight/88.5);
-  const trainingKcal = 3250 * (weight/88.5);
+  const stepsKcal = stepsGoal * 0.05 * (weight/88.5);
+  const trainingKcal = 500 * WEEKLY_TRAINING_GOAL * (weight/88.5);
   const subtotal = tmb*7 + stepsKcal + trainingKcal;
   const tef = subtotal * 0.10;
   const maintenance = subtotal + tef;
   return Math.round(maintenance - 3850); // deficit for 0.5kg/week
 }
 
-const WEEKLY_STEPS_GOAL = 140000;
-const WEEKLY_TRAINING_GOAL = 5;
-const WEEKLY_REST_GOAL = 2;
+const WEEKLY_TRAINING_GOAL = 4;
+const WEEKLY_REST_GOAL = 3;
 
 // Estimativa de gasto calórico real da semana com base no peso inicial, passos registrados e dias de treino registrados
 function calcWeeklyExpenditure(weight, actualStepsSum, trainingDaysCount){
@@ -279,6 +279,7 @@ function calcWeeklyExpenditure(weight, actualStepsSum, trainingDaysCount){
 function weekTotals(w){
   const steps = w.steps || [null,null,null,null,null,null,null];
   const workouts = w.workouts || [null,null,null,null,null,null,null];
+  const stepsGoal = w.stepsGoal || DEFAULT_STEPS_GOAL;
   const filled = w.days.filter(d => d !== null && d !== '' && !isNaN(d));
   const consumed = filled.reduce((s,d)=> s + Number(d), 0);
   const remaining = w.target - consumed;
@@ -289,7 +290,7 @@ function weekTotals(w){
 
   const stepsFilled = steps.filter(s => s !== null && s !== '' && !isNaN(s));
   const stepsSum = stepsFilled.reduce((s,d)=> s + Number(d), 0);
-  const stepsRemaining = WEEKLY_STEPS_GOAL - stepsSum;
+  const stepsRemaining = stepsGoal - stepsSum;
   const stepsDaysLogged = stepsFilled.length;
 
   const trainingDaysLogged = workouts.filter(v => v && v !== 'rest').length;
@@ -300,8 +301,8 @@ function weekTotals(w){
   const balance = expenditure - consumed; // positivo = déficit, negativo = superávit
 
   return {consumed, remaining, daysLogged, daysLeft, avgSoFar, avgAllowedRest,
-    stepsSum, stepsRemaining, stepsDaysLogged, trainingDaysLogged, restDaysLogged, workoutDaysSet,
-    stepsSum, stepsRemaining, stepsDaysLogged, expenditure, balance};
+    stepsGoal, stepsSum, stepsRemaining, stepsDaysLogged, trainingDaysLogged, restDaysLogged, workoutDaysSet,
+    expenditure, balance};
 }
 
 function renderWeekList(){
@@ -324,7 +325,7 @@ function renderWeekList(){
     return `<div class="weekcard ${isActive?'active':''}" data-id="${k}">
       <div>
         <div class="wc-label">${w.label}</div>
-        <div class="wc-sub">peso inicial: ${w.startWeight} kg · meta: ${fmt(w.target)} kcal</div>
+        <div class="wc-sub">peso inicial: ${w.startWeight} kg · meta: ${fmt(w.target)} kcal · ${fmt(w.stepsGoal || DEFAULT_STEPS_GOAL)} passos</div>
       </div>
       <div class="wc-status ${statusClass}">${statusText}</div>
     </div>`;
@@ -344,10 +345,11 @@ function renderDetail(id){
   const w = weeks[id];
   if(!w.steps) w.steps = [null,null,null,null,null,null,null];
   if(!w.workouts) w.workouts = [null,null,null,null,null,null,null];
+  if(!w.stepsGoal) w.stepsGoal = DEFAULT_STEPS_GOAL;
   const t = weekTotals(w);
   const pct = Math.min(100, Math.max(0, (t.consumed / w.target) * 100));
   const over = t.remaining < 0;
-  const stepsPct = Math.min(100, Math.max(0, (t.stepsSum / WEEKLY_STEPS_GOAL) * 100));
+  const stepsPct = Math.min(100, Math.max(0, (t.stepsSum / t.stepsGoal) * 100));
   const stepsOver = t.stepsRemaining < 0;
 
   let balanceClass = 'maint', balanceLabel = 'Manutenção';
@@ -372,6 +374,11 @@ function renderDetail(id){
           <label>Meta semanal (kcal)</label>
           <input type="number" step="10" id="targetInput" value="${w.target}">
         </div>
+      </div>
+
+      <div class="field">
+        <label>Meta de passos (semana)</label>
+        <input type="number" step="1000" id="stepsGoalInput" value="${w.stepsGoal}">
       </div>
 
       <div class="gauge-wrap">
@@ -399,14 +406,14 @@ function renderDetail(id){
             <div class="gauge-label">${stepsOver ? 'passos acima da meta' : 'passos restantes na semana'}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:13px;color:var(--muted)">${fmt(t.stepsSum)} / ${fmt(WEEKLY_STEPS_GOAL)}</div>
+            <div style="font-size:13px;color:var(--muted)">${fmt(t.stepsSum)} / ${fmt(t.stepsGoal)}</div>
             <div class="gauge-label">caminhados</div>
           </div>
         </div>
         <div class="gauge-track"><div class="gauge-fill steps" style="width:${stepsPct}%"></div></div>
         <div class="gauge-meta">
           <span>${t.stepsDaysLogged}/7 dias registrados</span>
-          <span>meta: 140.000 passos/semana</span>
+          <span>meta: ${fmt(t.stepsGoal)} passos/semana</span>
         </div>
       </div>
 
@@ -434,12 +441,16 @@ function renderDetail(id){
               <span class="day-card-name">${d}</span>
               <select data-workoutday="${i}">
                 <option value="">— treino —</option>
-                <option value="push" ${w.workouts[i]==='push'?'selected':''}>Push</option>
-                <option value="pull" ${w.workouts[i]==='pull'?'selected':''}>Pull</option>
-                <option value="legs" ${w.workouts[i]==='legs'?'selected':''}>Legs</option>
-                <option value="upper" ${w.workouts[i]==='upper'?'selected':''}>Upper</option>
-                <option value="lower" ${w.workouts[i]==='lower'?'selected':''}>Lower</option>
+                <option value="torso" ${w.workouts[i]==='torso'?'selected':''}>Torso A</option>
+                <option value="limbs" ${w.workouts[i]==='limbs'?'selected':''}>Limbs A</option>
                 <option value="rest" ${w.workouts[i]==='rest'?'selected':''}>Descanso</option>
+                <optgroup label="Divisão antiga (PPL/UL)">
+                  <option value="push" ${w.workouts[i]==='push'?'selected':''}>Push</option>
+                  <option value="pull" ${w.workouts[i]==='pull'?'selected':''}>Pull</option>
+                  <option value="legs" ${w.workouts[i]==='legs'?'selected':''}>Legs</option>
+                  <option value="upper" ${w.workouts[i]==='upper'?'selected':''}>Upper</option>
+                  <option value="lower" ${w.workouts[i]==='lower'?'selected':''}>Lower</option>
+                </optgroup>
               </select>
             </div>
             <div class="day-card-bottom">
@@ -465,7 +476,7 @@ function renderDetail(id){
           <div class="balance-row"><span class="lbl">Calorias consumidas</span><span class="val">${fmt(t.consumed)} kcal</span></div>
           <div class="balance-row"><span class="lbl">Passos registrados</span><span class="val">${fmt(t.stepsSum)}</span></div>
         </div>
-        <div class="balance-note">Gasto estimado a partir do peso inicial, dos passos registrados e dos dias de treino efetivamente marcados nesta semana (~500 kcal/sessão PPL/UL). Quanto mais dias preenchidos, mais precisa a estimativa.</div>
+        <div class="balance-note">Gasto estimado a partir do peso inicial, dos passos registrados e dos dias de treino efetivamente marcados nesta semana (~500 kcal/sessão de treino, 2 séries/exercício, 4-8 reps, 0-1 RIR). Quanto mais dias preenchidos, mais precisa a estimativa.</div>
       </div>
     </div>
   `;
@@ -481,6 +492,15 @@ function renderDetail(id){
     const val = parseFloat(e.target.value);
     if(!isNaN(val)){
       w.target = val;
+      await saveWeek(id, w);
+      renderDetail(id);
+      renderWeekList();
+    }
+  });
+  document.getElementById('stepsGoalInput').addEventListener('change', async (e)=>{
+    const val = parseFloat(e.target.value);
+    if(!isNaN(val)){
+      w.stepsGoal = val;
       await saveWeek(id, w);
       renderDetail(id);
       renderWeekList();
@@ -600,13 +620,19 @@ document.getElementById('newWeekBtn').addEventListener('click', async ()=>{
     if(!confirm('Já existe uma semana começando nessa data. Deseja substituí-la?')) return;
   }
 
-  const suggested = calcSuggestedTarget(weight);
+  const defaultStepsGoal = lastKey ? (weeks[lastKey].stepsGoal || DEFAULT_STEPS_GOAL) : DEFAULT_STEPS_GOAL;
+  const stepsGoalStr = prompt('Previsão de passos para essa semana (usada para calcular a meta calórica):', defaultStepsGoal);
+  if(stepsGoalStr === null) return;
+  const stepsGoal = parseFloat(stepsGoalStr.replace(',', '.'));
+  if(isNaN(stepsGoal)){ alert('Previsão de passos inválida.'); return; }
+
+  const suggested = calcSuggestedTarget(weight, stepsGoal);
   const targetStr = prompt('Meta calórica para a semana (kcal):', suggested);
   if(targetStr === null) return;
   const target = parseFloat(targetStr.replace(',', '.'));
   if(isNaN(target)){ alert('Meta inválida.'); return; }
 
-  const w = { startDate: iso, label, startWeight: weight, target,
+  const w = { startDate: iso, label, startWeight: weight, target, stepsGoal,
     days: [null,null,null,null,null,null,null],
     steps: [null,null,null,null,null,null,null],
     workouts: [null,null,null,null,null,null,null] };
@@ -618,12 +644,6 @@ document.getElementById('newWeekBtn').addEventListener('click', async ()=>{
 });
 
 loadAll();
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
-}
 
 document.getElementById('exportBtn').addEventListener('click', async ()=>{
   const keys = sortedWeekKeys();
@@ -639,6 +659,7 @@ document.getElementById('exportBtn').addEventListener('click', async ()=>{
         dataInicio: w.startDate,
         pesoInicial: w.startWeight,
         metaKcal: w.target,
+        metaPassos: w.stepsGoal || DEFAULT_STEPS_GOAL,
         kcalPorDia: w.days,
         passosPorDia: w.steps,
         treinoPorDia: w.workouts,
@@ -661,6 +682,12 @@ document.getElementById('exportBtn').addEventListener('click', async ()=>{
     prompt('Não deu pra copiar automaticamente. Selecione tudo (Ctrl+A / Cmd+A) e copie manualmente:', text);
   }
 });
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
